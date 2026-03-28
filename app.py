@@ -6,17 +6,25 @@
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import Literal, Optional
+from typing import Literal, Optional, List
 import joblib
 import numpy as np
 import pandas as pd
 import os
 
 # ── Load artefacts ──────────────────────────────────────────────
-MODEL     = joblib.load('model_artefacts/xgb_churn_model.pkl')
-SCALER    = joblib.load('model_artefacts/scaler.pkl')
-FEATURES  = joblib.load('model_artefacts/selected_features.pkl')
-THRESHOLD = joblib.load('model_artefacts/threshold.pkl')
+def load_artifacts():
+    """Load model artifacts with error handling."""
+    try:
+        MODEL = joblib.load('model_artefacts/xgb_churn_model.pkl')
+        SCALER = joblib.load('model_artefacts/scaler.pkl')
+        FEATURES = joblib.load('model_artefacts/selected_features.pkl')
+        THRESHOLD = joblib.load('model_artefacts/threshold.pkl')
+        return MODEL, SCALER, FEATURES, THRESHOLD
+    except FileNotFoundError as e:
+        raise RuntimeError(f"Model artifact not found: {e}")
+
+MODEL, SCALER, FEATURES, THRESHOLD = load_artifacts()
 
 # ── App setup ───────────────────────────────────────────────────
 app = FastAPI(
@@ -27,7 +35,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['*'],
+    allow_origins=["*"],  # Change to specific origins in production
     allow_methods=['*'],
     allow_headers=['*']
 )
@@ -180,5 +188,5 @@ def predict_churn(account: AccountFeatures = Body(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post('/predict/batch')
-def predict_batch(accounts: list[AccountFeatures]):
+def predict_batch(accounts: List[AccountFeatures]):
     return [predict_churn(a) for a in accounts]
